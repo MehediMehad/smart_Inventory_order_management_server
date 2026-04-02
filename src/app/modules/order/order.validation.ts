@@ -3,6 +3,8 @@ import { z } from "zod";
 
 const createOrderSchema = z.object({
     customerName: z.string(),
+    address: z.string(),
+    contact: z.string(), // Phone number or email
     items: z.array(
         z.object({
             productId: z.string(),

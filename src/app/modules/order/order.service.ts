@@ -66,6 +66,8 @@ const createOrder = async (userId: string, payload: TCreateOrderPayload) => {
             data: {
                 orderId: orderId,
                 customerName: payload.customerName,
+                address: payload.address,
+                contact: payload.contact,
                 totalPrice: calculatedTotalPrice,
                 status: OrderStatus.PENDING,
                 items: {
