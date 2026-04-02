@@ -17,7 +17,7 @@ router.get(
 );
 
 router.post(
-    "/create-product",
+    "/",
     auth('ADMIN', 'USER'),
     validateRequest(ProductValidations.createProductSchema),
     ProductControllers.createProductIntoDB
