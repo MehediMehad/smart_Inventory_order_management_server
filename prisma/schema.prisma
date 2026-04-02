@@ -78,7 +78,9 @@ model Order {
   userId       String      @db.ObjectId
   items        OrderItem[]
 
-  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([customerName])
   @@map("orders")
 }
 
