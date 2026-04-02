@@ -1,0 +1,17 @@
+const distanceInKm = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const toRad = (n: number) => (n * Math.PI) / 180;
+  const R = 6371; // Earth radius km
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  // Dhaka → Chittagong distance
+  // const distance = distanceInKm(23.8103, 90.4125, 22.3569, 91.7832);
+  // console.log(distance); // Output: 214 km
+};
+
+export const locationHelpers = {
+  distanceInKm,
+};

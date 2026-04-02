@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       String         @id @default(auto()) @map("_id") @db.ObjectId
+  name     String
+  image    String
+  email    String         @unique
+  phone    String
+  password String
+  role     UserRoleEnum
+  status   UserStatusEnum @default(DEACTIVATE)
+
+  fcmTokens   String[] // Push 🔔 multiple device support
+  isVerified  Boolean   @default(false)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Notification Relations
+  notificationsSent     Notification[] @relation("sender")
+  notificationsReceived Notification[] @relation("receiver")
+
+  @@map("users")
+}
+
+model Notification {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Who sent the notification (null = system)
+  senderId String? @db.ObjectId
+  sender   User?   @relation("sender", fields: [senderId], references: [id])
+
+  // Who received the notification
+  receiverId String @db.ObjectId
+  receiver   User   @relation("receiver", fields: [receiverId], references: [id])
+
+  // Content
+  title String
+  body  String
+  data  Json? // Additional data payload
+
+  // 🔥 Generic Type
+  type NotificationTypeEnum @default(NOTIFY) // MESSAGE , FRIEND_REQUEST, SYSTEM_ALERT, NOTIFY
+
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([receiverId, isRead])
+  @@index([type])
+  @@map("notifications")
+}
+
+enum NotificationTypeEnum {
+  NOTIFY
+  SYSTEM_ALERT
+}
+
+// OTP Storage Database
+model Otp {
+  id        String      @id @default(auto()) @map("_id") @db.ObjectId
+  email     String
+  code      String
+  type      OtpTypeEnum //  VERIFY_EMAIL, RESET_PASSWORD, VERIFY_PHONE,
+  createdAt DateTime    @default(now())
+  expiresAt DateTime
+
+  @@unique([email, code, type])
+  @@index([email, type, expiresAt])
+  @@map("opts")
+}
+
+// Enums
+enum OtpTypeEnum {
+  LOGIN
+  FORGOT_PASSWORD
+  VERIFY_EMAIL
+  RESET_PASSWORD
+  VERIFY_PHONE
+  VERIFY_USER
+}
+
+enum UserRoleEnum {
+  ADMIN
+}
+
+enum UserStatusEnum {
+  DEACTIVATE
+  ACTIVE
+  BLOCKED
+}
