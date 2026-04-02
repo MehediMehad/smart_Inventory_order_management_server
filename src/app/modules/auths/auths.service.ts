@@ -161,10 +161,6 @@ const loginUser = async (payload: TLoginPayload) => {
 
   if (!isPasswordMatch) throw new ApiError(httpStatus.UNAUTHORIZED, 'Invalid password');
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { fcmTokens: { push: payload.fcmToken }, lastLoginAt: new Date() },
-  });
 
   const accessToken = authHelpers.createAccessToken({
     userId: user.id,
