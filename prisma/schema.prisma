@@ -69,6 +69,7 @@ enum ProductStatus {
 // Orders & Order Items
 model Order {
   id           String      @id @default(auto()) @map("_id") @db.ObjectId
+  orderId      String      @unique // New field for human-readable order ID(ORDER-0001, ORDER-0002)
   customerName String
   totalPrice   Float
   status       OrderStatus @default(PENDING)

@@ -19,7 +19,7 @@ router.get(
 );
 
 router.post(
-    "/create-order",
+    "/",
     auth('USER', 'ADMIN'),
     validateRequest(OrderValidations.createOrderSchema),
     OrderControllers.createOrderIntoDB

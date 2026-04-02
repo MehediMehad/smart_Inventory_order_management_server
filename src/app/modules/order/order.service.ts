@@ -10,6 +10,22 @@ const createOrder = async (userId: string, payload: TCreateOrderPayload) => {
     return await prisma.$transaction(async (tx) => {
         let calculatedTotalPrice = 0;
 
+        // 🔹 Get last order to generate next serial
+        const lastCreatedOrder = await tx.order.findFirst({
+            orderBy: { createdAt: 'desc' },
+            select: { orderId: true },
+        });
+
+        // Extract number from last orderId and increment
+        let nextOrderNumber = 1;
+        if (lastCreatedOrder?.orderId) {
+            const lastNumber = parseInt(lastCreatedOrder.orderId.split('-')[1], 10);
+            nextOrderNumber = lastNumber + 1;
+        }
+
+        // Format orderId with leading zeros
+        const orderId = `ORD-${nextOrderNumber.toString().padStart(3, '0')}`;
+
         // 1. Validate products and calculate total price
         const itemsWithPrices = await Promise.all(
             payload.items.map(async (item) => {
@@ -48,13 +64,14 @@ const createOrder = async (userId: string, payload: TCreateOrderPayload) => {
         // 3. Create Order
         const result = await tx.order.create({
             data: {
-                userId,
+                orderId: orderId,
                 customerName: payload.customerName,
                 totalPrice: calculatedTotalPrice,
                 status: OrderStatus.PENDING,
                 items: {
                     create: itemsWithPrices,
                 },
+                user: { connect: { id: userId } }
             },
             include: {
                 items: true,
@@ -105,7 +122,6 @@ const getAllOrders = async (filter: IOrderFilter, options: IPaginationOptions) =
             items: {
                 include: { product: true }
             },
-            user: { select: { name: true, email: true } }
         },
     });
 
@@ -117,6 +133,8 @@ const getAllOrders = async (filter: IOrderFilter, options: IPaginationOptions) =
         limit,
         total,
         totalPages: Math.ceil(total / limit),
+        hasNextPage: page < Math.ceil(total / limit),
+        hasPrevPage: page > 1,
     };
 
     return {
