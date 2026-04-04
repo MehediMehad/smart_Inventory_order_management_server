@@ -162,8 +162,8 @@ const createOrder = async (userId: string, payload: TCreateOrderPayload) => {
                 let priority: Priority = 'LOW';
 
                 const halfThreshold = Math.ceil(product.minStockThreshold / 2);
-                const quarterThreshold = Math.ceil(product.minStockThreshold / 4);
-                if (currentStock <= quarterThreshold) {
+                // const quarterThreshold = Math.ceil(product.minStockThreshold / 4);
+                if (currentStock === 0) {
                     priority = 'HIGH';
                 } else if (currentStock <= halfThreshold) {
                     priority = 'MEDIUM';
