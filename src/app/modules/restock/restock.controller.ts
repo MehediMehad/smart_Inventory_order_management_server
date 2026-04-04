@@ -20,7 +20,8 @@ const getAllFromQueue = catchAsync(async (req: Request, res: Response) => {
 });
 
 const restockProduct = catchAsync(async (req: Request, res: Response) => {
-    const result = await RestockServices.restockProduct(req.body);
+    const userId = req.user.userId;
+    const result = await RestockServices.restockProduct(userId, req.body);
     sendResponse(res, {
         statusCode: httpStatus.OK,
         success: true,

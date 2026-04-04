@@ -89,7 +89,7 @@ const getAllRestockQueue = async (
     };
 };
 
-const restockProduct = async (payload: TRestockProductPayload) => {
+const restockProduct = async (userId: string, payload: TRestockProductPayload) => {
     const { productId, addedQuantity } = payload;
 
     const product = await prisma.product.findUnique({
@@ -120,17 +120,26 @@ const restockProduct = async (payload: TRestockProductPayload) => {
             // Re-calculate priority if still below threshold
             let priority: Priority = 'LOW';
             const currentStock = updatedProduct.stockQuantity;
-            const threshold = updatedProduct.minStockThreshold;
+            const halfThreshold = Math.ceil(product.minStockThreshold / 2);
 
-            if (currentStock <= Math.ceil(threshold / 4)) {
+            if (currentStock === 0) {
                 priority = 'HIGH';
-            } else if (currentStock <= Math.ceil(threshold / 2)) {
+            } else if (currentStock <= halfThreshold) {
                 priority = 'MEDIUM';
             }
 
             await tx.restockQueue.update({
                 where: { productId },
                 data: { priority },
+            });
+
+            // Activity Log
+            await tx.activityLog.create({
+                data: {
+                    message: `Product "${product.name}" has been restocked`,
+                    activityType: "RESTOCK_PRODUCT",
+                    userId: userId,
+                },
             });
         }
 
@@ -141,7 +150,7 @@ const restockProduct = async (payload: TRestockProductPayload) => {
 const removeFromQueueManually = async (id: string) => {
     return await prisma.restockQueue.delete({
         where: { id },
-    });
+    })
 };
 
 export const RestockServices = {

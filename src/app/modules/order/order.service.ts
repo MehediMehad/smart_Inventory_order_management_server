@@ -1,4 +1,4 @@
-import { OrderStatus, Priority, Prisma } from '@prisma/client';
+import { ActivityTypeEnum, OrderStatus, Priority, Prisma } from '@prisma/client';
 import httpStatus from 'http-status';
 import ApiError from '../../errors/ApiError';
 import { paginationHelper } from '../../helpers/paginationHelper';
@@ -177,6 +177,15 @@ const createOrder = async (userId: string, payload: TCreateOrderPayload) => {
                         priority,
                     },
                 });
+
+                // Activity Log
+                await tx.activityLog.create({
+                    data: {
+                        message: `Restock warning for product "${product.name}" with this "${priority.toLowerCase()}" priority`,
+                        activityType: "RESTOCK_WARNING",
+                        userId,
+                    },
+                });
             }
 
             orderItems.push({
@@ -202,6 +211,15 @@ const createOrder = async (userId: string, payload: TCreateOrderPayload) => {
             },
             include: {
                 items: true,
+            },
+        });
+
+        // 8. Create Activity Log
+        await tx.activityLog.create({
+            data: {
+                message: `New order "${order.orderId}" has been placed`,
+                activityType: "ORDER_PLACED",
+                userId,
             },
         });
 
@@ -326,6 +344,14 @@ const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
 };
 
 const updateOrderStatus = async (id: string, status: OrderStatus) => {
+    const statusToActivityMap: Record<OrderStatus, ActivityTypeEnum> = {
+        PENDING: "ORDER_PLACED",      // if you ever reset to PENDING
+        CONFIRMED: "ORDER_CONFIRMED",
+        SHIPPED: "ORDER_SHIPPED",
+        DELIVERED: "ORDER_DELIVERED",
+        CANCELLED: "ORDER_CANCELLED",
+    };
+
     const order = await prisma.order.findUnique({
         where: { id },
     });
@@ -354,10 +380,24 @@ const updateOrderStatus = async (id: string, status: OrderStatus) => {
         );
     }
 
-    // update
-    return await prisma.order.update({
-        where: { id },
-        data: { status },
+    return await prisma.$transaction(async (tx) => {
+        // Update order status
+        const updatedOrder = await tx.order.update({
+            where: { id },
+            data: { status },
+        });
+        // 2️⃣ Determine activity type
+        const activityStatus = statusToActivityMap[status];
+        // Activity Log
+        await tx.activityLog.create({
+            data: {
+                message: `Order "${order.orderId}" status has been updated to ${status}`,
+                activityType: activityStatus,
+                userId: order.userId,
+            },
+        });
+
+        return updatedOrder;
     });
 };
 
