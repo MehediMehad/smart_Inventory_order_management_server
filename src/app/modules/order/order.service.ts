@@ -1,12 +1,11 @@
-import { OrderStatus, Prisma } from '@prisma/client';
+import { OrderStatus, Priority, Prisma } from '@prisma/client';
 import httpStatus from 'http-status';
 import ApiError from '../../errors/ApiError';
 import { paginationHelper } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interface/pagination.type';
 import prisma from '../../libs/prisma';
 import type { TCreateOrderPayload } from './order.interface';
-
-const createOrder = async (userId: string, payload: TCreateOrderPayload) => {
+const createOrder3 = async (userId: string, payload: TCreateOrderPayload) => {
     return await prisma.$transaction(async (tx) => {
         let calculatedTotalPrice = 0;
 
@@ -83,6 +82,133 @@ const createOrder = async (userId: string, payload: TCreateOrderPayload) => {
         return result;
     });
 };
+
+const generateOrderId = async (tx: Prisma.TransactionClient) => {
+    const lastOrder = await tx.order.findFirst({
+        orderBy: { createdAt: 'desc' },
+        select: { orderId: true },
+    });
+
+    let next = 1;
+
+    if (lastOrder?.orderId) {
+        const lastNumber = parseInt(lastOrder.orderId.split('-')[1], 10);
+        next = lastNumber + 1;
+    }
+
+    return `ORD-${next.toString().padStart(4, '0')}`;
+};
+
+const createOrder = async (userId: string, payload: TCreateOrderPayload) => {
+    return prisma.$transaction(async (tx) => {
+        let totalPrice = 0;
+
+        const orderId = await generateOrderId(tx);
+
+        const orderItems: any[] = [];
+
+        for (const item of payload.items) {
+            // 1. Get product
+            const product = await tx.product.findUnique({
+                where: { id: item.productId },
+            });
+
+            if (!product) {
+                throw new ApiError(
+                    httpStatus.NOT_FOUND,
+                    `Product not found`
+                );
+            }
+
+            // 2. Atomic stock update (NO RACE CONDITION)
+            const updated = await tx.product.updateMany({
+                where: {
+                    id: item.productId,
+                    stockQuantity: { gte: item.quantity },
+                },
+                data: {
+                    stockQuantity: { decrement: item.quantity },
+                },
+            });
+
+            if (updated.count === 0) {
+                throw new ApiError(
+                    httpStatus.BAD_REQUEST,
+                    `Only ${product.stockQuantity} items available for ${product.name}`
+                );
+            }
+
+            // 3. Calculate price
+            const itemTotal = product.price * item.quantity;
+            totalPrice += itemTotal;
+
+            // 4. Get updated stock value
+            const updatedProduct = await tx.product.findUnique({
+                where: { id: item.productId },
+            });
+
+            const currentStock = updatedProduct!.stockQuantity;
+
+            // 5. Update product status
+            if (currentStock === 0) {
+                await tx.product.update({
+                    where: { id: item.productId },
+                    data: { status: 'OUT_OF_STOCK' },
+                });
+            }
+
+            // 6. Restock Queue Logic 🔥
+            if (currentStock <= product.minStockThreshold) {
+                let priority: Priority = 'LOW';
+
+                const halfThreshold = Math.ceil(product.minStockThreshold / 2);
+                const quarterThreshold = Math.ceil(product.minStockThreshold / 4);
+                if (currentStock <= quarterThreshold) {
+                    priority = 'HIGH';
+                } else if (currentStock <= halfThreshold) {
+                    priority = 'MEDIUM';
+                }
+
+                await tx.restockQueue.upsert({
+                    where: { productId: product.id },
+                    update: { priority },
+                    create: {
+                        productId: product.id,
+                        priority,
+                    },
+                });
+            }
+
+            orderItems.push({
+                productId: item.productId,
+                quantity: item.quantity,
+                price: product.price,
+            });
+        }
+
+        // 7. Create Order
+        const order = await tx.order.create({
+            data: {
+                orderId,
+                customerName: payload.customerName,
+                address: payload.address,
+                contact: payload.contact,
+                totalPrice,
+                status: OrderStatus.PENDING,
+                user: { connect: { id: userId } },
+                items: {
+                    create: orderItems,
+                },
+            },
+            include: {
+                items: true,
+            },
+        });
+
+        return order;
+    });
+};
+
 
 interface IOrderFilter {
     searchTerm?: string;
