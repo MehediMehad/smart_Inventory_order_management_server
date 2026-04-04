@@ -6,11 +6,29 @@ import { IPaginationOptions } from '../../interface/pagination.type';
 import prisma from '../../libs/prisma';
 import { TCreateProductPayload, TUpdateProductPayload } from './product.interface';
 
-const createProduct = async (payload: TCreateProductPayload) => {
-    const result = await prisma.product.create({
-        data: payload,
-        include: { category: true }
+const createProduct = async (
+    userId: string,
+    payload: TCreateProductPayload
+) => {
+    const result = await prisma.$transaction(async (tx) => {
+        // Create Product
+        const product = await tx.product.create({
+            data: payload,
+            include: { category: true },
+        });
+
+        // Create Activity Log
+        await tx.activityLog.create({
+            data: {
+                message: `New product "${product.name}" has been added`,
+                activityType: "PRODUCT_ADDED",
+                userId,
+            },
+        });
+
+        return product;
     });
+
     return result;
 };
 
@@ -93,21 +111,67 @@ const getSingleProduct = async (id: string) => {
     return result;
 };
 
-const updateProduct = async (id: string, payload: TUpdateProductPayload) => {
-    await getSingleProduct(id);
-    const result = await prisma.product.update({
-        where: { id },
-        data: payload,
+const updateProduct = async (
+    userId: string,
+    id: string,
+    payload: TUpdateProductPayload
+) => {
+    return await prisma.$transaction(async (tx) => {
+        // Check product exists
+        const product = await tx.product.findUnique({
+            where: { id },
+        });
+
+        if (!product) {
+            throw new ApiError(httpStatus.NOT_FOUND, "Product not found");
+        }
+
+        // Update product
+        const updatedProduct = await tx.product.update({
+            where: { id },
+            data: payload,
+        });
+
+        // Activity Log
+        await tx.activityLog.create({
+            data: {
+                message: `Product "${product.name}" has been updated`,
+                activityType: "PRODUCT_UPDATED",
+                userId,
+            },
+        });
+
+        return updatedProduct;
     });
-    return result;
 };
 
-const deleteProduct = async (id: string) => {
-    await getSingleProduct(id);
-    const result = await prisma.product.delete({
-        where: { id },
+const deleteProduct = async (userId: string, id: string) => {
+    return await prisma.$transaction(async (tx) => {
+        // Check product exists
+        const product = await tx.product.findUnique({
+            where: { id },
+        });
+
+        if (!product) {
+            throw new ApiError(httpStatus.NOT_FOUND, "Product not found");
+        }
+
+        // Delete product
+        const result = await tx.product.delete({
+            where: { id },
+        });
+
+        // Activity Log
+        await tx.activityLog.create({
+            data: {
+                message: `Product "${product.name}" has been deleted`,
+                activityType: "PRODUCT_DELETED",
+                userId,
+            },
+        });
+
+        return result;
     });
-    return result;
 };
 
 export const ProductServices = {
