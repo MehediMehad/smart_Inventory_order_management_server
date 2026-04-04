@@ -136,7 +136,7 @@ const restockProduct = async (userId: string, payload: TRestockProductPayload) =
             // Activity Log
             await tx.activityLog.create({
                 data: {
-                    message: `Product "${product.name}" has been restocked`,
+                    message: `Product "${updatedProduct.name}" has been added to Restock Queue`,
                     activityType: "RESTOCK_PRODUCT",
                     userId: userId,
                 },
