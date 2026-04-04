@@ -1,4 +1,4 @@
-import { Prisma, ProductStatus } from '@prisma/client';
+import { Priority, Prisma, ProductStatus } from '@prisma/client';
 import httpStatus from 'http-status';
 import ApiError from '../../errors/ApiError';
 import { paginationHelper } from '../../helpers/paginationHelper';
@@ -131,6 +131,61 @@ const updateProduct = async (
             where: { id },
             data: payload,
         });
+
+        if (
+            payload.stockQuantity !== undefined &&
+            payload.stockQuantity !== product.stockQuantity
+        ) {
+            const newStock = payload.stockQuantity;
+
+            // 1. Update Product Status
+            if (newStock === 0) {
+                await tx.product.update({
+                    where: { id },
+                    data: { status: "OUT_OF_STOCK" },
+                });
+            } else if (product.status === "OUT_OF_STOCK") {
+                await tx.product.update({
+                    where: { id },
+                    data: { status: "ACTIVE" },
+                });
+            }
+
+            // 2. Restock Queue Logic
+            if (newStock <= product.minStockThreshold) {
+                let priority: Priority = "LOW";
+
+                const halfThreshold = Math.ceil(product.minStockThreshold / 2);
+
+                if (newStock === 0) {
+                    priority = "HIGH";
+                } else if (newStock <= halfThreshold) {
+                    priority = "MEDIUM";
+                }
+
+                await tx.restockQueue.upsert({
+                    where: { productId: product.id },
+                    update: { priority },
+                    create: {
+                        productId: product.id,
+                        priority,
+                    },
+                });
+
+                // Activity Log (Restock Warning)
+                await tx.activityLog.create({
+                    data: {
+                        message: `Restock warning for product "${product.name}" with "${priority.toLowerCase()}" priority`,
+                        activityType: "RESTOCK_WARNING",
+                        userId,
+                    },
+                });
+            } else {
+                await tx.restockQueue.deleteMany({
+                    where: { productId: product.id },
+                });
+            }
+        }
 
         // Activity Log
         await tx.activityLog.create({
