@@ -2,9 +2,9 @@ import { OrderStatus } from "@prisma/client";
 import { z } from "zod";
 
 const createOrderSchema = z.object({
-    customerName: z.string(),
-    address: z.string(),
-    contact: z.string(), // Phone number or email
+    customerName: z.string().min(1, "Customer name is required"),
+    address: z.string().min(1, "Address is required"),
+    contact: z.string().min(1, "Contact is required"), // Phone number or email
     items: z.array(
         z.object({
             productId: z.string(),

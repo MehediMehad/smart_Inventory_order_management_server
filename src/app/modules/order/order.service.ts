@@ -98,10 +98,27 @@ const getAllOrders = async (filter: IOrderFilter, options: IPaginationOptions) =
     const whereClause: Prisma.OrderWhereInput = {};
 
     if (searchTerm) {
-        whereClause.customerName = {
-            contains: searchTerm,
-            mode: 'insensitive',
-        };
+        whereClause.OR = [
+            {
+                orderId: {
+                    contains: searchTerm,
+                    mode: 'insensitive',
+                },
+            },
+            {
+                customerName: {
+                    contains: searchTerm,
+                    mode: 'insensitive',
+                },
+            },
+            {
+                contact: {
+                    contains: searchTerm,
+                    mode: 'insensitive',
+                },
+            },
+        ];
+
     }
 
     if (status) {
@@ -164,13 +181,6 @@ const getSingleOrder = async (id: string) => {
                     }
                 }
             },
-            user: {
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                }
-            }
         }
     });
 

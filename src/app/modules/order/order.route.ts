@@ -6,6 +6,13 @@ import { OrderValidations } from "./order.validation";
 
 const router = Router();
 
+router.post(
+    "/",
+    auth('USER', 'ADMIN'),
+    validateRequest(OrderValidations.createOrderSchema),
+    OrderControllers.createOrderIntoDB
+);
+
 router.get(
     "/",
     auth('ADMIN'),
@@ -16,13 +23,6 @@ router.get(
     "/:id",
     auth('ADMIN'),
     OrderControllers.getSingleOrder
-);
-
-router.post(
-    "/",
-    auth('USER', 'ADMIN'),
-    validateRequest(OrderValidations.createOrderSchema),
-    OrderControllers.createOrderIntoDB
 );
 
 router.patch(
