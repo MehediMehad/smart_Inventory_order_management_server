@@ -7,14 +7,13 @@
     "worker:start": "node ./dist/worker.js",
     "dev": "tsx watch src/server.ts",
     "worker": "tsx watch src/worker.ts",
-    "build": "tsc",
-    "prisma:generate": "prisma generate",
-    "prisma:studio": "prisma studio",
+    "build": "prisma generate && tsc",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "check-format": "prettier --check .",
-    "generate:module": "node scripts/generateModule.js"
+    "generate:module": "node scripts/generateModule.js",
+    "postinstall": "prisma generate"
   },
   "keywords": [],
   "author": "mehedihasanmehad",
