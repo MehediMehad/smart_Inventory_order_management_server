@@ -6,6 +6,7 @@ import { ProductRoutes } from '../app/modules/product/product.route';
 import { OrderRoutes } from '../app/modules/order/order.route';
 import { RestockRoutes } from '../app/modules/restock/restock.route';
 import { ActivityLogRoutes } from '../app/modules/activity/activity.route';
+import { DashboardRoutes } from '../app/modules/dashboard/dashboard.route';
 
 const router = express.Router();
 
@@ -33,6 +34,10 @@ const moduleRoutes = [
   {
     path: '/activity',
     route: ActivityLogRoutes,
+  },
+  {
+    path: '/dashboard',
+    route: DashboardRoutes,
   }
 ];
 
